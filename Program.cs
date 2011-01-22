@@ -81,6 +81,7 @@ namespace uberminer
 					switch (packetType)
 					{
 						case PacketType.KeepAlive:
+							Log("{0}: KeepAlive", label);
 							break;
 
 						case PacketType.Login:
@@ -148,7 +149,7 @@ namespace uberminer
 							br.ReadByte(); // x
 							br.ReadByte(); // y
 							br.ReadByte(); // z
-							Log("{0}: RelativeEntityMove", label);
+							//Log("{0}: RelativeEntityMove", label);
 							break;
 
 						case PacketType.EntityLook:
@@ -166,6 +167,31 @@ namespace uberminer
 							br.ReadByte(); // yaw
 							br.ReadByte(); // pitch
 							//Log("{0}: RelativeEntityMoveLook", label);
+							break;
+
+						case PacketType.EntityTeleport:
+							br.ReadInt32(); // entity id
+							br.ReadInt32(); // x
+							br.ReadInt32(); // y
+							br.ReadInt32(); // z
+							br.ReadByte(); // yaw
+							br.ReadByte(); // pitch
+							Log("{0}: EntityTeleport", label);
+							break;
+
+						case PacketType.EntityStatus:
+							br.ReadInt32(); // entity id
+							br.ReadByte(); // entity status
+							break;
+
+						case PacketType.AttachEntity:
+							br.ReadInt32(); // player being attached
+							br.ReadInt32(); // vehicle being attached
+							break;
+
+						case PacketType.EntityMetadata:
+							br.ReadInt32(); // entity id
+							while (br.ReadByte() != 127) { } // metadata
 							break;
 
 						case PacketType.PreChunk:
@@ -198,6 +224,15 @@ namespace uberminer
 							br.ReadBytes(arraySize); // types array
 							br.ReadBytes(arraySize); // metadata
 							Log("{0}: MultiBlockChange", label);
+							break;
+
+						case PacketType.BlockChange:
+							br.ReadInt32(); // x
+							br.ReadByte(); // y
+							br.ReadInt32(); // z
+							br.ReadByte(); // block type
+							br.ReadByte(); // block metadata
+							Log("{0}: BlockChange", label);
 							break;
 
 						case PacketType.MobSpawn:
@@ -242,7 +277,7 @@ namespace uberminer
 							br.ReadByte(); // y
 							br.ReadInt32(); // z
 							br.ReadByte(); // face
-							Log("{0}: BlockDig", label);
+							//Log("{0}: BlockDig", label);
 							break;
 
 						case PacketType.PlayerPosition:
@@ -416,7 +451,9 @@ namespace uberminer
 		EntityLook = 0x20,
 		RelativeEntityMoveLook = 0x21,
 		EntityTeleport = 0x22,
-		Unknown27 = 0x27,
+		EntityStatus = 0x26,
+		AttachEntity = 0x27,
+		EntityMetadata = 0x28,
 		PreChunk = 0x32,
 		MapChunk = 0x33,
 		MultiBlockChange = 0x34,
