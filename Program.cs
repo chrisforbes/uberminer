@@ -404,7 +404,14 @@ namespace uberminer
 		static string ReadMcString(this BinaryReader br)
 		{
 			var len = IPAddress.NetworkToHostOrder(br.ReadInt16());
-			return Encoding.UTF8.GetString(br.ReadBytes(len));
+			if (len > 0)
+			{
+				return Encoding.UTF8.GetString(br.ReadBytes(len));
+			}
+			else
+			{
+				return "";
+			}
 		}
 
 		static void Log(string format, params object[] arg)
