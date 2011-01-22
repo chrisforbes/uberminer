@@ -14,7 +14,7 @@ namespace uberminer
 	{
 		static void Main(string[] args)
 		{
-			var s = new TcpClient("localhost", 25565);
+			var s = new TcpClient("minecraft.omeganerd.com", 25565);
 			var l = new TcpListener(IPAddress.Any, 25564);
 			l.Start();
 
@@ -125,7 +125,7 @@ namespace uberminer
 							Log("{0}: Respawn", label);
 							break;
 
-						case PacketType.EntitySpawn:
+						case PacketType.PickupSpawn:
 							br.ReadInt32();		// id
 							br.ReadInt16();		// itemtype
 							br.ReadByte();		// count
@@ -136,7 +136,7 @@ namespace uberminer
 							br.ReadByte();		// y, p, r euler angles
 							br.ReadByte();
 							br.ReadByte();
-							Log("{0}: EntitySpawn", label);
+							Log("{0}: PickupSpawn", label);
 							break;
 
 						case PacketType.Entity:
@@ -144,12 +144,12 @@ namespace uberminer
 							//Log("{0}: Entity", label);
 							break;
 
-						case PacketType.RelativeEntityMove:
+						case PacketType.EntityRelativeMove:
 							br.ReadInt32(); // entity id
 							br.ReadByte(); // x
 							br.ReadByte(); // y
 							br.ReadByte(); // z
-							//Log("{0}: RelativeEntityMove", label);
+							//Log("{0}: EntityRelativeMove", label);
 							break;
 
 						case PacketType.EntityLook:
@@ -159,14 +159,14 @@ namespace uberminer
 							//Log("{0}: EntityLook", label);
 							break;
 
-						case PacketType.RelativeEntityMoveLook:
+						case PacketType.EntityLookRelativeMove:
 							br.ReadInt32(); // entity id
 							br.ReadByte(); // x
 							br.ReadByte(); // y
 							br.ReadByte(); // z
 							br.ReadByte(); // yaw
 							br.ReadByte(); // pitch
-							//Log("{0}: RelativeEntityMoveLook", label);
+							//Log("{0}: EntityLookRelativeMove", label);
 							break;
 
 						case PacketType.EntityTeleport:
@@ -260,7 +260,7 @@ namespace uberminer
 							br.ReadInt32(); // entity id
 							break;
 
-						case PacketType.PlayerMoveLook:
+						case PacketType.PlayerPositionLook:
 							br.ReadBytes(8);	// x,y
 							br.ReadBytes(8);
 							br.ReadBytes(8);	// stance
@@ -271,7 +271,7 @@ namespace uberminer
 							//Log("{0}: PlayerMoveLook", label);
 							break;
 
-						case PacketType.BlockDig:
+						case PacketType.PlayerDigging:
 							br.ReadByte(); // status
 							br.ReadInt32(); // x
 							br.ReadByte(); // y
@@ -314,7 +314,7 @@ namespace uberminer
 							//Log("{0}: PlayerLook", label);
 							break;
 
-						case PacketType.Place:
+						case PacketType.PlayerBlockPlace:
 							br.ReadInt16();		// blockid
 							br.ReadInt32();		// x
 							br.ReadByte();		// y
@@ -322,13 +322,13 @@ namespace uberminer
 							br.ReadByte();		// dir
 							br.ReadByte();		// count	-- uh, what?
 							br.ReadInt16();		// damage
-							Log("{0}: Place", label);
+							Log("{0}: PlayerBlockPlace", label);
 							break;
 
-						case PacketType.ArmAnimation:
+						case PacketType.Animation:
 							br.ReadInt32(); // entity id
 							br.ReadByte(); // forward animation
-							Log("{0}: ArmAnimation", label);
+							Log("{0}: Animation", label);
 							break;
 
 						case PacketType.EntityAction:
@@ -395,14 +395,14 @@ namespace uberminer
 							Log("{0}: SetSlot", label);
 							break;
 
-						case PacketType.BlockItemSwitch:
+						case PacketType.HoldingChange:
 							br.ReadInt16(); // block id
-							Log("{0}: BlockItemSwitch", label);
+							Log("{0}: HoldingChange", label);
 							break;
 
-						case PacketType.Kick:
+						case PacketType.DisconnectKick:
 							string reason = ReadMcString(br);
-							Log("{0}: Kicked - {1}", label, reason);
+							Log("{0}: DisconnectKick - {1}", label, reason);
 							break;
 
 						default:
@@ -442,24 +442,25 @@ namespace uberminer
 		PlayerOnGround = 0x0a,
 		PlayerPosition = 0x0b,
 		PlayerLook = 0x0c,
-		PlayerMoveLook = 0x0d,
-		BlockDig = 0x0e,
-		Place = 0x0f,
-		BlockItemSwitch = 0x10,
+		PlayerPositionLook = 0x0d,
+		PlayerDigging = 0x0e,
+		PlayerBlockPlace = 0x0f,
+		HoldingChange = 0x10,
 		AddToInventory = 0x11,
-		ArmAnimation = 0x12,
+		Animation = 0x12,
 		EntityAction = 0x13,
 		NamedEntitySpawn = 0x14,
-		EntitySpawn = 0x15,
+		PickupSpawn = 0x15,
 		CollectItem = 0x16,
-		Unknown17 = 0x17,
+		AddObjectVehicle = 0x17,
 		MobSpawn = 0x18,
+		EntityPainting = 0x18,
 		EntityVelocity = 0x1c,
 		DestroyEntity = 0x1d,
 		Entity = 0x1e,
-		RelativeEntityMove = 0x1f,
+		EntityRelativeMove = 0x1f,
 		EntityLook = 0x20,
-		RelativeEntityMoveLook = 0x21,
+		EntityLookRelativeMove = 0x21,
 		EntityTeleport = 0x22,
 		EntityStatus = 0x26,
 		AttachEntity = 0x27,
@@ -468,12 +469,16 @@ namespace uberminer
 		MapChunk = 0x33,
 		MultiBlockChange = 0x34,
 		BlockChange = 0x35,
-		ComplexEntity = 0x3b,
+		PlayNoteBlock = 0x36,
+		Explosion = 0x3c,
+		OpenWindow = 0x64,
 		CloseWindow = 0x65,
 		WindowClick = 0x66,
 		SetSlot = 0x67,
 		WindowItems = 0x68,
+		UpdateProgressBar = 0x69,
+		Transaction = 0x6a,
 		UpdateSign = 0x82,
-		Kick = 0xff,
+		DisconnectKick = 0xff,
 	}
 }
