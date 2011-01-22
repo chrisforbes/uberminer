@@ -352,6 +352,16 @@ namespace uberminer
 							Log("{0}: WindowItems - {1} items", label, count);
 							break;
 
+						case PacketType.UpdateSign:
+							br.ReadInt32();		// x
+							br.ReadByte();		// y
+							br.ReadInt32();		// z
+							ReadMcString(br);	// line 1
+							ReadMcString(br);	// line 2
+							ReadMcString(br);	// line 3
+							ReadMcString(br);	// line 4
+							break;
+
 						case PacketType.CloseWindow:
 							br.ReadByte(); // window id
 							Log("{0}: CloseWindow", label);
@@ -463,6 +473,7 @@ namespace uberminer
 		WindowClick = 0x66,
 		SetSlot = 0x67,
 		WindowItems = 0x68,
+		UpdateSign = 0x82,
 		Kick = 0xff,
 	}
 }
