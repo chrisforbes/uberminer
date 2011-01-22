@@ -14,8 +14,8 @@ namespace uberminer
 	{
 		static void Main(string[] args)
 		{
-			var s = new TcpClient("localhost", 25565);
-			var l = new TcpListener(IPAddress.Any, 25564);
+			var s = new TcpClient("minecraft.omeganerd.com", 25565);
+			var l = new TcpListener(IPAddress.Any, 25565);
 			l.Start();
 
 			var c = l.AcceptTcpClient();
@@ -24,9 +24,6 @@ namespace uberminer
 
 			var ss = s.GetStream();
 			var cs = c.GetStream();
-
-			var sc = 0;
-			var cc = 0;
 
 			var sk = new NamedPipeServerStream("serverpipe", PipeDirection.In);
 			var ck = new NamedPipeServerStream("clientpipe", PipeDirection.In);
@@ -37,28 +34,20 @@ namespace uberminer
 			var sj = new NamedPipeClientStream("localhost", "serverpipe", PipeDirection.Out); sj.Connect();
 			var cj = new NamedPipeClientStream("localhost", "clientpipe", PipeDirection.Out); cj.Connect();
 
-			new Thread(() => PassData(ss, () => ++sc, cs, sj)) { IsBackground = true }.Start();
-			new Thread(() => PassData(cs, () => ++cc, ss, cj)) { IsBackground = true }.Start();
+			new Thread(() => PassData(ss, cs, sj)) { IsBackground = true }.Start();
+			new Thread(() => PassData(cs, ss, cj)) { IsBackground = true }.Start();
 
 			for (; ; )
-			{
-	//			Console.Write("Server: {0}      Client: {1}      \r", sc, cc);
 				Thread.Sleep(1000);
-			}
 		}
 
-		static void PassData(Stream from, Action a, params Stream[] to)
+		static void PassData(Stream from, params Stream[] to)
 		{
-			var bs = new List<byte>();
-			
 			for (; ; )
 			{
 				var b = (byte)from.ReadByte();
-
 				foreach (var s in to)
 					s.WriteByte(b);
-
-				a();
 			}
 		}
 
