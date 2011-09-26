@@ -1811,7 +1811,7 @@ namespace uberminer
                      inventory[slot] = None
                     }
              */
-            short[] payload;
+            WindowItemPayload payload;
             BytesRead += reader.Read(out payload, Count);
         }
 
@@ -2182,6 +2182,13 @@ namespace uberminer
     public class Metadata
     {
         public Metadata()
+        {
+        }
+    }
+
+    public class WindowItemPayload
+    {
+        public WindowItemPayload()
         {
         }
     }

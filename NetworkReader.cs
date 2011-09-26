@@ -59,20 +59,20 @@ namespace uberminer
 
         public int Read(out Metadata m)
         {
-             /*
-             let x = 0 of type UNSIGNED byte
-             while (x = read byte from stream) does not equal 127:
-                 select based on value of (x >> 5):
-                     case 0: read byte from stream
-                     case 1: read short from stream
-                     case 2: read int from stream
-                     case 3: read float from stream
-                     case 4: read string (UCS-2) from stream
-                     case 5: read short, byte, short from stream; save as item stack (id, count, damage, respectively)
-                     case 6: read int, int, int from stream; save as extra entity information.
-                 end select
-             end while
-              */
+            /*
+            let x = 0 of type UNSIGNED byte
+            while (x = read byte from stream) does not equal 127:
+                select based on value of (x >> 5):
+                    case 0: read byte from stream
+                    case 1: read short from stream
+                    case 2: read int from stream
+                    case 3: read float from stream
+                    case 4: read string (UCS-2) from stream
+                    case 5: read short, byte, short from stream; save as item stack (id, count, damage, respectively)
+                    case 6: read int, int, int from stream; save as extra entity information.
+                end select
+            end while
+             */
 
             int read = 0;
 
@@ -143,6 +143,43 @@ namespace uberminer
             return read;
         }
 
+        public int Read(out WindowItemPayload p, int count)
+        {
+            /*
+             offset = 0
+ 
+             for slot in count:
+                 item_id = payload[offset] as short
+                 offset += 2
+                 if item_id is not equal to -1:
+                     count = payload[offset] as byte
+                     offset += 1
+                     uses = payload[offset] as short
+                     offset += 2
+                     inventory[slot] = new item(item_id, count, uses)
+                 else:
+                     inventory[slot] = None
+                    }
+             */
+            var read = 0;
+
+            for (int slot = 0; slot < count; ++slot)
+            {
+                short id;
+                read += Read(out id);
+                if (id != -1)
+                {
+                    byte quantity;
+                    read += Read(out quantity);
+                    short uses;
+                    read += Read(out uses);
+                }
+            }
+
+            p = new WindowItemPayload();
+            return read;
+        }
+
         public int Read(out byte[] b, int size)
         {
             int read = size;
@@ -200,22 +237,22 @@ namespace uberminer
         }
 
         // I don't think this type is ever used
-         public int ReadS8(out string s)
-         {
-             int read = 0;
-             short length;
-             read += Read(out length);
+        public int ReadS8(out string s)
+        {
+            int read = 0;
+            short length;
+            read += Read(out length);
 
-             if (length >= 0)
-             {
-                 s = Encoding.UTF8.GetString(ReadBytes(length));
-                 read += length;
-             }
-             else
-             {
-                 s = "";
-             }
-             return read;
-         }
+            if (length >= 0)
+            {
+                s = Encoding.UTF8.GetString(ReadBytes(length));
+                read += length;
+            }
+            else
+            {
+                s = "";
+            }
+            return read;
+        }
     }
 }

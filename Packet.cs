@@ -89,7 +89,7 @@ namespace uberminer
             packetCheck.Add(PacketType.KeepAlive,                   true);
             packetCheck.Add(PacketType.LoginRequest,                true);
             packetCheck.Add(PacketType.Handshake,                   true);
-            packetCheck.Add(PacketType.ChatMessage,                 false);
+            packetCheck.Add(PacketType.ChatMessage,                 true);
             packetCheck.Add(PacketType.TimeUpdate,                  true);
             packetCheck.Add(PacketType.EntityEquipment,             true);
             packetCheck.Add(PacketType.SpawnPosition,               true);
@@ -124,7 +124,7 @@ namespace uberminer
             packetCheck.Add(PacketType.EntityStatus,                true);
             packetCheck.Add(PacketType.AttachEntity,                false);
             packetCheck.Add(PacketType.EntityMetadata,              true);
-            packetCheck.Add(PacketType.EntityEffect,                false);
+            packetCheck.Add(PacketType.EntityEffect,                true);
             packetCheck.Add(PacketType.RemoveEntityEffect,          false);
             packetCheck.Add(PacketType.Experience,                  true);
             packetCheck.Add(PacketType.PreChunk,                    true);
@@ -144,12 +144,12 @@ namespace uberminer
             packetCheck.Add(PacketType.Updateprogressbar,           false);
             packetCheck.Add(PacketType.Transaction,                 false);
             packetCheck.Add(PacketType.Creativeinventoryaction,     false);
-            packetCheck.Add(PacketType.UpdateSign,                  false);
+            packetCheck.Add(PacketType.UpdateSign,                  true);
             packetCheck.Add(PacketType.ItemData,                    false);
             packetCheck.Add(PacketType.IncrementStatistic,          false);
             packetCheck.Add(PacketType.PlayerListItem,              true);
             packetCheck.Add(PacketType.ServerListPing,              false);
-            packetCheck.Add(PacketType.Disconnect_Kick,             false);
+            packetCheck.Add(PacketType.Disconnect_Kick,             true);
         }
 
         public Packet(PacketType type)
