@@ -13,9 +13,6 @@ namespace uberminer
 {
     public static class Program
     {
-        static readonly object _object = new object();
-        public static Queue<Byte> streamQueue = new Queue<Byte>();
-
         static void Main(string[] args)
         {
             var server = new TcpClient("minecraft.omeganerd.com", 25565);

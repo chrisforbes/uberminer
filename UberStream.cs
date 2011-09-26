@@ -15,7 +15,6 @@ namespace uberminer
         {
         }
 
-        bool once = false;
         public override void Write(byte[] data, int offset, int count)
         {
             for (var i = 0; i < count; ++i)
