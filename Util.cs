@@ -5,7 +5,7 @@ using System.Text;
 
 namespace uberminer
 {
-....// quick hack
+    // quick hack
     public class Vector3
     {
         public double X;
