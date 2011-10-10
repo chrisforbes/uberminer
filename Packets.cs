@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.IO;
 
 namespace uberminer
 {
@@ -16,17 +17,43 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out KAId);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out KAId));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(KAId);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+                tempWriter.Write(writer.Prepare(KAId));
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleKeepAlive != null)
+            {
+                return handler.HandleKeepAlive(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -46,38 +73,62 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityId);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                // disabling this stuff.
-                // as we are only reading server to client we need to
-                // not read a string as it will make us out of sync with the stream
-                // TODO: Determine which stream we're reading.
-                short t;
-                BytesRead += reader.Read(out t);
-                //BytesRead += reader.ReadS16(out Username);
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityId));
+                writer.Write(reader.Read(out Username));
+                writer.Write(reader.Read(out MapSeed));
+                writer.Write(reader.Read(out ServerMode));
+                writer.Write(reader.Read(out Dimension));
+                writer.Write(reader.Read(out Difficulty));
+                writer.Write(reader.Read(out WorldHeight));
+                writer.Write(reader.Read(out MaxPlayers));
+
+                Uberminer.Log("EntityID: {0}\n Username: {1}\n MapSeed: {2}\n ServerMode: {3}\n",
+                    EntityId, Username, MapSeed, ServerMode);
+                Uberminer.Log("Dimension: {0}\n Difficulty: {1}\n WorldHeight: {2}\n MaxPlayers: {3}",
+                    Dimension, Difficulty, WorldHeight, MaxPlayers);
             }
-            BytesRead += reader.Read(out MapSeed);
-            BytesRead += reader.Read(out ServerMode);
-            BytesRead += reader.Read(out Dimension);
-            BytesRead += reader.Read(out Difficulty);
-            BytesRead += reader.Read(out WorldHeight);
-            BytesRead += reader.Read(out MaxPlayers);
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityId);
-            writer.Write(Username);
-            writer.Write(MapSeed);
-            writer.Write(Dimension);
-            writer.Write(Difficulty);
-            writer.Write(WorldHeight);
-            writer.Write(MaxPlayers);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+                tempWriter.Write(writer.Prepare(EntityId));
+                tempWriter.Write(writer.Prepare(Username));
+                tempWriter.Write(writer.Prepare(MapSeed));
+                tempWriter.Write(writer.Prepare(ServerMode));
+                tempWriter.Write(writer.Prepare(Dimension));
+                tempWriter.Write(writer.Prepare(Difficulty));
+                tempWriter.Write(writer.Prepare(WorldHeight));
+                tempWriter.Write(writer.Prepare(MaxPlayers));
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleLoginRequest != null)
+            {
+                return handler.HandleLoginRequest(this);
+            }
+            else
+            {
+                return true;
+            }
         }
 
     }
@@ -91,17 +142,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.ReadS16(out Hash);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Hash));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Hash);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Hash));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleHandshake != null)
+            {
+                return handler.HandleHandshake(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -114,18 +193,46 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.ReadS16(out Message);
-            Program.Log("Chat: {0}", Message);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Message));
+                Uberminer.Log("Chat: {0}", Message);
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Message);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Message));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleChatMessage != null)
+            {
+                return handler.HandleChatMessage(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -138,17 +245,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Time);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Time));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Time);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Time));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleTimeUpdate != null)
+            {
+                return handler.HandleTimeUpdate(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -164,24 +299,52 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityId);
-            BytesRead += reader.Read(out Slot);
-            BytesRead += reader.Read(out ItemId);
-            BytesRead += reader.Read(out Damage);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityId));
+                writer.Write(reader.Read(out Slot));
+                writer.Write(reader.Read(out ItemId));
+                writer.Write(reader.Read(out Damage));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityId);
-            writer.Write(Slot);
-            writer.Write(ItemId);
-            writer.Write(Damage);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
 
+                tempWriter.Write(writer.Prepare(EntityId));
+                tempWriter.Write(writer.Prepare(Slot));
+                tempWriter.Write(writer.Prepare(ItemId));
+                tempWriter.Write(writer.Prepare(Damage));
+
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityEquipment != null)
+            {
+                return handler.HandleEntityEquipment(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -196,21 +359,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleSpawnPosition != null)
+            {
+                return handler.HandleSpawnPosition(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -225,21 +416,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out User);
-            BytesRead += reader.Read(out Target);
-            BytesRead += reader.Read(out LeftClick);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out User));
+                writer.Write(reader.Read(out Target));
+                writer.Write(reader.Read(out LeftClick));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(User);
-            writer.Write(Target);
-            writer.Write(LeftClick);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(User));
+                tempWriter.Write(writer.Prepare(Target));
+                tempWriter.Write(writer.Prepare(LeftClick));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleUseEntity != null)
+            {
+                return handler.HandleUseEntity(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -254,21 +473,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Health);
-            BytesRead += reader.Read(out Food);
-            BytesRead += reader.Read(out FoodSaturation);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Health));
+                writer.Write(reader.Read(out Food));
+                writer.Write(reader.Read(out FoodSaturation));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Health);
-            writer.Write(Food);
-            writer.Write(FoodSaturation);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Health));
+                tempWriter.Write(writer.Prepare(Food));
+                tempWriter.Write(writer.Prepare(FoodSaturation));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleUpdateHealth != null)
+            {
+                return handler.HandleUpdateHealth(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -285,25 +532,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out World);
-            BytesRead += reader.Read(out Difficulty);
-            BytesRead += reader.Read(out Mode);
-            BytesRead += reader.Read(out WorldHeight);
-            BytesRead += reader.Read(out MapSeed);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out World));
+                writer.Write(reader.Read(out Difficulty));
+                writer.Write(reader.Read(out Mode));
+                writer.Write(reader.Read(out WorldHeight));
+                writer.Write(reader.Read(out MapSeed));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(World);
-            writer.Write(Difficulty);
-            writer.Write(Mode);
-            writer.Write(WorldHeight);
-            writer.Write(MapSeed);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(World));
+                tempWriter.Write(writer.Prepare(Difficulty));
+                tempWriter.Write(writer.Prepare(Mode));
+                tempWriter.Write(writer.Prepare(WorldHeight));
+                tempWriter.Write(writer.Prepare(MapSeed));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleRespawn != null)
+            {
+                return handler.HandleRespawn(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -316,17 +591,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out OnGround));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(OnGround));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayer != null)
+            {
+                return handler.HandlePlayer(this);
+            }
+            else
+            {
+                return true;
+            }
         }
 
     }
@@ -344,25 +647,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Stance);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Stance));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out OnGround));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Stance);
-            writer.Write(Z);
-            writer.Write(OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Stance));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(OnGround));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerPosition != null)
+            {
+                return handler.HandlePlayerPosition(this);
+            }
+            else
+            {
+                return true;
+            }
         }
 
     }
@@ -378,21 +709,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
-            BytesRead += reader.Read(out OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+                writer.Write(reader.Read(out OnGround));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Yaw);
-            writer.Write(Pitch);
-            writer.Write(OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+                tempWriter.Write(writer.Prepare(OnGround));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerLook != null)
+            {
+                return handler.HandlePlayerLook(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -411,29 +770,76 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Stance);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
-            BytesRead += reader.Read(out OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+
+                if (reader.direction == StreamDirection.ServerToClient)
+                {
+                    writer.Write(reader.Read(out Stance));
+                    writer.Write(reader.Read(out Y));
+                }
+                else
+                {
+                    writer.Write(reader.Read(out Y));
+                    writer.Write(reader.Read(out Stance));
+                }
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+                writer.Write(reader.Read(out OnGround));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Stance);
-            writer.Write(Z);
-            writer.Write(Yaw);
-            writer.Write(Pitch);
-            writer.Write(OnGround);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+
+                tempWriter.Write(writer.Prepare(X));
+
+                if (writer.direction == StreamDirection.ServerToClient)
+                {
+                    tempWriter.Write(writer.Prepare(Stance));
+                    tempWriter.Write(writer.Prepare(Y));
+                }
+                else
+                {
+                    tempWriter.Write(writer.Prepare(Y));
+                    tempWriter.Write(writer.Prepare(Stance));
+                }
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+                tempWriter.Write(writer.Prepare(OnGround));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerPosition_Look != null)
+            {
+                return handler.HandlePlayerPosition_Look(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -450,25 +856,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Status);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Face);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Status));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Face));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Status);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Face);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Status));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Face));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerDigging != null)
+            {
+                return handler.HandlePlayerDigging(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -487,32 +921,63 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Direction);
-            BytesRead += reader.Read(out BlockorItemID);
-            if (BlockorItemID >= 0)
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                BytesRead += reader.Read(out Amount_opt);
-                BytesRead += reader.Read(out Damage_opt);
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Direction));
+                writer.Write(reader.Read(out BlockorItemID));
+                if (BlockorItemID >= 0)
+                {
+                    writer.Write(reader.Read(out Amount_opt));
+                    writer.Write(reader.Read(out Damage_opt));
+                }
             }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Direction);
-            writer.Write(BlockorItemID);
-            writer.Write(Amount_opt);
-            writer.Write(Damage_opt);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Direction));
+                tempWriter.Write(writer.Prepare(BlockorItemID));
+                if (BlockorItemID >= 0)
+                {
+                    tempWriter.Write(writer.Prepare(Amount_opt));
+                    tempWriter.Write(writer.Prepare(Damage_opt));
+                }
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerBlockPlacement != null)
+            {
+                return handler.HandlePlayerBlockPlacement(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -524,17 +989,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out SlotID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out SlotID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(SlotID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(SlotID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleHoldingChange != null)
+            {
+                return handler.HandleHoldingChange(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -551,25 +1044,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out InBed);
-            BytesRead += reader.Read(out Xcoordinate);
-            BytesRead += reader.Read(out Ycoordinate);
-            BytesRead += reader.Read(out Zcoordinate);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out InBed));
+                writer.Write(reader.Read(out Xcoordinate));
+                writer.Write(reader.Read(out Ycoordinate));
+                writer.Write(reader.Read(out Zcoordinate));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(InBed);
-            writer.Write(Xcoordinate);
-            writer.Write(Ycoordinate);
-            writer.Write(Zcoordinate);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(InBed));
+                tempWriter.Write(writer.Prepare(Xcoordinate));
+                tempWriter.Write(writer.Prepare(Ycoordinate));
+                tempWriter.Write(writer.Prepare(Zcoordinate));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleUseBed != null)
+            {
+                return handler.HandleUseBed(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -583,19 +1104,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out Animate);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out Animate));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(Animate);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(Animate));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleAnimation != null)
+            {
+                return handler.HandleAnimation(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -609,19 +1158,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out ActionID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out ActionID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(ActionID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(ActionID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityAction != null)
+            {
+                return handler.HandleEntityAction(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -641,32 +1218,60 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.ReadS16(out PlayerName);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Rotation);
-            BytesRead += reader.Read(out Pitch);
-            BytesRead += reader.Read(out CurrentItem);
-            Program.Log("Player Name {0}", PlayerName);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out PlayerName));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Rotation));
+                writer.Write(reader.Read(out Pitch));
+                writer.Write(reader.Read(out CurrentItem));
+                Uberminer.Log("Player Name {0}", PlayerName);
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(PlayerName);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Rotation);
-            writer.Write(Pitch);
-            writer.Write(CurrentItem);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(PlayerName));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Rotation));
+                tempWriter.Write(writer.Prepare(Pitch));
+                tempWriter.Write(writer.Prepare(CurrentItem));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleNamedEntitySpawn != null)
+            {
+                return handler.HandleNamedEntitySpawn(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -688,35 +1293,63 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out Item);
-            BytesRead += reader.Read(out Count);
-            BytesRead += reader.Read(out Damage_Data);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Rotation);
-            BytesRead += reader.Read(out Pitch);
-            BytesRead += reader.Read(out Roll);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out Item));
+                writer.Write(reader.Read(out Count));
+                writer.Write(reader.Read(out Damage_Data));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Rotation));
+                writer.Write(reader.Read(out Pitch));
+                writer.Write(reader.Read(out Roll));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(Item);
-            writer.Write(Count);
-            writer.Write(Damage_Data);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Rotation);
-            writer.Write(Pitch);
-            writer.Write(Roll);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(Item));
+                tempWriter.Write(writer.Prepare(Count));
+                tempWriter.Write(writer.Prepare(Damage_Data));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Rotation));
+                tempWriter.Write(writer.Prepare(Pitch));
+                tempWriter.Write(writer.Prepare(Roll));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePickupSpawn != null)
+            {
+                return handler.HandlePickupSpawn(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -730,19 +1363,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out CollectedEID);
-            BytesRead += reader.Read(out CollectorEID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out CollectedEID));
+                writer.Write(reader.Read(out CollectorEID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(CollectedEID);
-            writer.Write(CollectorEID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(CollectedEID));
+                tempWriter.Write(writer.Prepare(CollectorEID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleCollectItem != null)
+            {
+                return handler.HandleCollectItem(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -763,33 +1424,65 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out ObjectType);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out FireballthrowerEntityID);
-            BytesRead += reader.Read(out Unknown1);
-            BytesRead += reader.Read(out Unknown2);
-            BytesRead += reader.Read(out Unknown3);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out ObjectType));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out FireballthrowerEntityID));
+                if (FireballthrowerEntityID > 0)
+                {
+                    writer.Write(reader.Read(out Unknown1));
+                    writer.Write(reader.Read(out Unknown2));
+                    writer.Write(reader.Read(out Unknown3));
+                }
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(ObjectType);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(FireballthrowerEntityID);
-            writer.Write(Unknown1);
-            writer.Write(Unknown2);
-            writer.Write(Unknown3);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(ObjectType));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(FireballthrowerEntityID));
+                if (FireballthrowerEntityID > 0)
+                {
+                    tempWriter.Write(writer.Prepare(Unknown1));
+                    tempWriter.Write(writer.Prepare(Unknown2));
+                    tempWriter.Write(writer.Prepare(Unknown3));
+                }
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleAddObject_Vehicle != null)
+            {
+                return handler.HandleAddObject_Vehicle(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -809,33 +1502,59 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            byte mobType;
-            BytesRead += reader.Read(out mobType);
-            MobType = (MobTypes)mobType;
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
-            BytesRead += reader.Read(out DataStream);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                byte mobType;
+                writer.Write(reader.Read(out mobType));
+                MobType = (MobTypes)mobType;
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+                writer.Write(reader.Read(out DataStream));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write((byte)MobType);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Yaw);
-            writer.Write(Pitch);
-            writer.Write(DataStream);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare((byte)MobType));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+                tempWriter.Write(writer.Prepare(DataStream.data));
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleMobSpawn != null)
+            {
+                return handler.HandleMobSpawn(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -853,27 +1572,55 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.ReadS16(out Title);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Direction);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out Title));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Direction));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(Title);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Direction);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(Title));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Direction));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityPainting != null)
+            {
+                return handler.HandleEntityPainting(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -890,25 +1637,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out x);
-            BytesRead += reader.Read(out y);
-            BytesRead += reader.Read(out z);
-            BytesRead += reader.Read(out count);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out x));
+                writer.Write(reader.Read(out y));
+                writer.Write(reader.Read(out z));
+                writer.Write(reader.Read(out count));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(x);
-            writer.Write(y);
-            writer.Write(z);
-            writer.Write(count);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(x));
+                tempWriter.Write(writer.Prepare(y));
+                tempWriter.Write(writer.Prepare(z));
+                tempWriter.Write(writer.Prepare(count));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleExperienceOrb != null)
+            {
+                return handler.HandleExperienceOrb(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -926,27 +1701,55 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Unknown1);
-            BytesRead += reader.Read(out Unknown2);
-            BytesRead += reader.Read(out Unknown3);
-            BytesRead += reader.Read(out Unknown4);
-            BytesRead += reader.Read(out Unknown5);
-            BytesRead += reader.Read(out Unknown6);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Unknown1));
+                writer.Write(reader.Read(out Unknown2));
+                writer.Write(reader.Read(out Unknown3));
+                writer.Write(reader.Read(out Unknown4));
+                writer.Write(reader.Read(out Unknown5));
+                writer.Write(reader.Read(out Unknown6));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Unknown1);
-            writer.Write(Unknown2);
-            writer.Write(Unknown3);
-            writer.Write(Unknown4);
-            writer.Write(Unknown5);
-            writer.Write(Unknown6);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Unknown1));
+                tempWriter.Write(writer.Prepare(Unknown2));
+                tempWriter.Write(writer.Prepare(Unknown3));
+                tempWriter.Write(writer.Prepare(Unknown4));
+                tempWriter.Write(writer.Prepare(Unknown5));
+                tempWriter.Write(writer.Prepare(Unknown6));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleStanceupdate != null)
+            {
+                return handler.HandleStanceupdate(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -962,23 +1765,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out VelocityX);
-            BytesRead += reader.Read(out VelocityY);
-            BytesRead += reader.Read(out VelocityZ);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out VelocityX));
+                writer.Write(reader.Read(out VelocityY));
+                writer.Write(reader.Read(out VelocityZ));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(VelocityX);
-            writer.Write(VelocityY);
-            writer.Write(VelocityZ);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(VelocityX));
+                tempWriter.Write(writer.Prepare(VelocityY));
+                tempWriter.Write(writer.Prepare(VelocityZ));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityVelocity != null)
+            {
+                return handler.HandleEntityVelocity(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -991,17 +1822,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleDestroyEntity != null)
+            {
+                return handler.HandleDestroyEntity(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1014,17 +1873,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntity != null)
+            {
+                return handler.HandleEntity(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1040,23 +1927,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out dX);
-            BytesRead += reader.Read(out dY);
-            BytesRead += reader.Read(out dZ);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out dX));
+                writer.Write(reader.Read(out dY));
+                writer.Write(reader.Read(out dZ));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(dX);
-            writer.Write(dY);
-            writer.Write(dZ);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(dX));
+                tempWriter.Write(writer.Prepare(dY));
+                tempWriter.Write(writer.Prepare(dZ));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityRelativeMove != null)
+            {
+                return handler.HandleEntityRelativeMove(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1071,21 +1986,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(Yaw);
-            writer.Write(Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityLook != null)
+            {
+                return handler.HandleEntityLook(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1103,27 +2046,55 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out dX);
-            BytesRead += reader.Read(out dY);
-            BytesRead += reader.Read(out dZ);
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out dX));
+                writer.Write(reader.Read(out dY));
+                writer.Write(reader.Read(out dZ));
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(dX);
-            writer.Write(dY);
-            writer.Write(dZ);
-            writer.Write(Yaw);
-            writer.Write(Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(dX));
+                tempWriter.Write(writer.Prepare(dY));
+                tempWriter.Write(writer.Prepare(dZ));
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityLookandRelativeMove != null)
+            {
+                return handler.HandleEntityLookandRelativeMove(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1141,27 +2112,55 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EID);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Yaw);
-            BytesRead += reader.Read(out Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EID));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Yaw));
+                writer.Write(reader.Read(out Pitch));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EID);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Yaw);
-            writer.Write(Pitch);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EID));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Yaw));
+                tempWriter.Write(writer.Prepare(Pitch));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityTeleport != null)
+            {
+                return handler.HandleEntityTeleport(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1175,19 +2174,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out EntityStatus);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out EntityStatus));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(EntityStatus);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(EntityStatus));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityStatus != null)
+            {
+                return handler.HandleEntityStatus(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1201,19 +2228,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out VehicleID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out VehicleID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(VehicleID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(VehicleID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleAttachEntity != null)
+            {
+                return handler.HandleAttachEntity(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1227,19 +2282,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out EntityMetadata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out EntityMetadata));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(EntityMetadata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(EntityMetadata.data));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityMetadata != null)
+            {
+                return handler.HandleEntityMetadata(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1255,23 +2338,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out EffectID);
-            BytesRead += reader.Read(out Amplifier);
-            BytesRead += reader.Read(out Duration);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out EffectID));
+                writer.Write(reader.Read(out Amplifier));
+                writer.Write(reader.Read(out Duration));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(EffectID);
-            writer.Write(Amplifier);
-            writer.Write(Duration);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(EffectID));
+                tempWriter.Write(writer.Prepare(Amplifier));
+                tempWriter.Write(writer.Prepare(Duration));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleEntityEffect != null)
+            {
+                return handler.HandleEntityEffect(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1285,19 +2396,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out EffectID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out EffectID));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(EffectID);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(EffectID));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleRemoveEntityEffect != null)
+            {
+                return handler.HandleRemoveEntityEffect(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1312,21 +2451,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Currentexperience);
-            BytesRead += reader.Read(out Level);
-            BytesRead += reader.Read(out Totalexperience);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Currentexperience));
+                writer.Write(reader.Read(out Level));
+                writer.Write(reader.Read(out Totalexperience));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Currentexperience);
-            writer.Write(Level);
-            writer.Write(Totalexperience);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Currentexperience));
+                tempWriter.Write(writer.Prepare(Level));
+                tempWriter.Write(writer.Prepare(Totalexperience));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleExperience != null)
+            {
+                return handler.HandleExperience(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1341,21 +2508,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Mode);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Mode));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Z);
-            writer.Write(Mode);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Mode));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePreChunk != null)
+            {
+                return handler.HandlePreChunk(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1370,74 +2565,168 @@ namespace uberminer
         public int CompressedSize;
         public byte[] CompressedData;
 
+        private byte[] chunk = null;
+
         public MapChunkPacket()
             : base(PacketType.MapChunk) { }
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Size_X);
-            BytesRead += reader.Read(out Size_Y);
-            BytesRead += reader.Read(out Size_Z);
-            BytesRead += reader.Read(out CompressedSize);
-            BytesRead += reader.Read(out CompressedData, CompressedSize);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Size_X));
+                writer.Write(reader.Read(out Size_Y));
+                writer.Write(reader.Read(out Size_Z));
+                writer.Write(reader.Read(out CompressedSize));
+                writer.Write(reader.Read(out CompressedData, CompressedSize));
+
+                Size_X++;
+                Size_Y++;
+                Size_Z++;
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Size_X);
-            writer.Write(Size_Y);
-            writer.Write(Size_Z);
-            writer.Write(CompressedSize);
-            writer.Write(CompressedData);
+            // totally cheating some more
+            writer.Write(BytesRead);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleMapChunk != null)
+            {
+                return handler.HandleMapChunk(this);
+            }
+            else
+            {
+                return true;
+            }
         }
+
+        public byte[] Chunk
+        {
+            get
+            {
+                if (chunk == null)
+                {
+                    chunk = DecompressChunk();
+                }
+                return chunk;
+            }
+        }
+
+        private byte[] DecompressChunk()
+        {
+            int maxSize = (int)(16 * 16 * 128 * 2.5);
+            var chunkBytes = new byte[maxSize];
+
+            var stream = new zlib.ZStream();
+
+            var ret = stream.inflateInit();
+
+            if (ret != zlib.zlibConst.Z_OK)
+            {
+                Uberminer.Log("zlib: inflateInit failed");
+                return null;
+            }
+
+            stream.avail_in = CompressedSize;
+            stream.next_in = CompressedData;
+            stream.avail_out = maxSize;
+            stream.next_out = chunkBytes;
+
+            ret = stream.inflate(zlib.zlibConst.Z_NO_FLUSH);
+
+            switch (ret)
+            {
+                case zlib.zlibConst.Z_NEED_DICT:
+                case zlib.zlibConst.Z_DATA_ERROR:
+                case zlib.zlibConst.Z_MEM_ERROR:
+                    Uberminer.Log("zlib: Error inflating");
+                    return null;
+            }
+
+            stream.inflateEnd();
+
+            return chunkBytes;
+        }
+
     }
 
     public class MultiBlockChangePacket : Packet
     {
         public int ChunkX;
         public int ChunkZ;
-        public short Arraysize;
-        public short[] Coordinatearray;
-        public byte[] Typearray;
-        public byte[] Metadataarray;
+        public short ArraySize;
+        public short[] CoordinateArray;
+        public byte[] TypeArray;
+        public byte[] MetadataArray;
 
         public MultiBlockChangePacket()
             : base(PacketType.MultiBlockChange) { }
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out ChunkX);
-            BytesRead += reader.Read(out ChunkZ);
-            BytesRead += reader.Read(out Arraysize);
-            BytesRead += reader.Read(out Coordinatearray, Arraysize);
-            BytesRead += reader.Read(out Typearray, Arraysize);
-            BytesRead += reader.Read(out Metadataarray, Arraysize);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out ChunkX));
+                writer.Write(reader.Read(out ChunkZ));
+                writer.Write(reader.Read(out ArraySize));
+                writer.Write(reader.Read(out CoordinateArray, ArraySize));
+                writer.Write(reader.Read(out TypeArray, ArraySize));
+                writer.Write(reader.Read(out MetadataArray, ArraySize));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(ChunkX);
-            writer.Write(ChunkZ);
-            writer.Write(Arraysize);
-            writer.Write(Coordinatearray);
-            writer.Write(Typearray);
-            writer.Write(Metadataarray);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(ChunkX));
+                tempWriter.Write(writer.Prepare(ChunkZ));
+                tempWriter.Write(writer.Prepare(ArraySize));
+                foreach (var s in CoordinateArray)
+                {
+                    tempWriter.Write(writer.Prepare(s));
+                }
+                tempWriter.Write(writer.Prepare(TypeArray));
+                tempWriter.Write(writer.Prepare(MetadataArray));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleMultiBlockChange != null)
+            {
+                return handler.HandleMultiBlockChange(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1454,25 +2743,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out BlockType);
-            BytesRead += reader.Read(out BlockMetadata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out BlockType));
+                writer.Write(reader.Read(out BlockMetadata));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(BlockType);
-            writer.Write(BlockMetadata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(BlockType));
+                tempWriter.Write(writer.Prepare(BlockMetadata));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleBlockChange != null)
+            {
+                return handler.HandleBlockChange(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1489,25 +2806,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Byte1);
-            BytesRead += reader.Read(out Byte2);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Byte1));
+                writer.Write(reader.Read(out Byte2));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Byte1);
-            writer.Write(Byte2);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Byte1));
+                tempWriter.Write(writer.Prepare(Byte2));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleBlockAction != null)
+            {
+                return handler.HandleBlockAction(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1525,27 +2870,55 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Unknown);
-            BytesRead += reader.Read(out Recordcount);
-            BytesRead += reader.Read(out Records, Recordcount * 3);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Unknown));
+                writer.Write(reader.Read(out Recordcount));
+                writer.Write(reader.Read(out Records, Recordcount * 3));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Unknown);
-            writer.Write(Recordcount);
-            writer.Write(Records);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Unknown));
+                tempWriter.Write(writer.Prepare(Recordcount));
+                tempWriter.Write(writer.Prepare(Records));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleExplosion != null)
+            {
+                return handler.HandleExplosion(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1562,25 +2935,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EffectID);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.Read(out Sounddata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EffectID));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Sounddata));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EffectID);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Sounddata);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EffectID));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Sounddata));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleSoundeffect != null)
+            {
+                return handler.HandleSoundeffect(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1594,19 +2995,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Reason);
-            BytesRead += reader.Read(out Gamemode);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Reason));
+                writer.Write(reader.Read(out Gamemode));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Reason);
-            writer.Write(Gamemode);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Reason));
+                tempWriter.Write(writer.Prepare(Gamemode));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleNew_InvalidState != null)
+            {
+                return handler.HandleNew_InvalidState(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1623,25 +3052,53 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out EntityID);
-            BytesRead += reader.Read(out Unknown);
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out EntityID));
+                writer.Write(reader.Read(out Unknown));
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(EntityID);
-            writer.Write(Unknown);
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(EntityID));
+                tempWriter.Write(writer.Prepare(Unknown));
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleThunderbolt != null)
+            {
+                return handler.HandleThunderbolt(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1657,23 +3114,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out InventoryType);
-            BytesRead += reader.ReadS16(out Windowtitle);
-            BytesRead += reader.Read(out NumberofSlots);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out InventoryType));
+                writer.Write(reader.Read(out Windowtitle));
+                writer.Write(reader.Read(out NumberofSlots));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(InventoryType);
-            writer.Write(Windowtitle);
-            writer.Write(NumberofSlots);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Windowid));
+                tempWriter.Write(writer.Prepare(InventoryType));
+                tempWriter.Write(writer.Prepare(Windowtitle));
+                tempWriter.Write(writer.Prepare(NumberofSlots));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleOpenwindow != null)
+            {
+                return handler.HandleOpenwindow(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1686,17 +3171,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Windowid));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleClosewindow != null)
+            {
+                return handler.HandleClosewindow(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1716,31 +3229,64 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out Slot);
-            BytesRead += reader.Read(out Right_click);
-            BytesRead += reader.Read(out Actionnumber);
-            BytesRead += reader.Read(out Shift);
-            BytesRead += reader.Read(out ItemID);
-            BytesRead += reader.Read(out Itemcount);
-            BytesRead += reader.Read(out Itemuses);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out Slot));
+                writer.Write(reader.Read(out Right_click));
+                writer.Write(reader.Read(out Actionnumber));
+                writer.Write(reader.Read(out Shift));
+                writer.Write(reader.Read(out ItemID));
+                if (ItemID != -1)
+                {
+                    writer.Write(reader.Read(out Itemcount));
+                    writer.Write(reader.Read(out Itemuses));
+                }
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(Slot);
-            writer.Write(Right_click);
-            writer.Write(Actionnumber);
-            writer.Write(Shift);
-            writer.Write(ItemID);
-            writer.Write(Itemcount);
-            writer.Write(Itemuses);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Windowid));
+                tempWriter.Write(writer.Prepare(Slot));
+                tempWriter.Write(writer.Prepare(Right_click));
+                tempWriter.Write(writer.Prepare(Actionnumber));
+                tempWriter.Write(writer.Prepare(Shift));
+                tempWriter.Write(writer.Prepare(ItemID));
+                if (ItemID != -1)
+                {
+                    tempWriter.Write(writer.Prepare(Itemcount));
+                    tempWriter.Write(writer.Prepare(Itemuses));
+                }
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleWindowclick != null)
+            {
+                return handler.HandleWindowclick(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1757,28 +3303,39 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out Slot);
-            BytesRead += reader.Read(out ItemID);
-            if (ItemID != -1)
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                BytesRead += reader.Read(out ItemCount);
-                BytesRead += reader.Read(out Itemuses);
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out Slot));
+                writer.Write(reader.Read(out ItemID));
+                if (ItemID != -1)
+                {
+                    writer.Write(reader.Read(out ItemCount));
+                    writer.Write(reader.Read(out Itemuses));
+                }
             }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(Slot);
-            writer.Write(ItemID);
-            writer.Write(ItemCount);
-            writer.Write(Itemuses);
+            // cheating on this one as well
+            writer.Write(BytesRead);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleSetslot != null)
+            {
+                return handler.HandleSetslot(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1792,38 +3349,52 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out Count);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out Count));
 
-            /*
-             offset = 0
+                /*
+                 offset = 0
  
-             for slot in count:
-                 item_id = payload[offset] as short
-                 offset += 2
-                 if item_id is not equal to -1:
-                     count = payload[offset] as byte
-                     offset += 1
-                     uses = payload[offset] as short
+                 for slot in count:
+                     item_id = payload[offset] as short
                      offset += 2
-                     inventory[slot] = new item(item_id, count, uses)
-                 else:
-                     inventory[slot] = None
-                    }
-             */
-            WindowItemPayload payload;
-            BytesRead += reader.Read(out payload, Count);
+                     if item_id is not equal to -1:
+                         count = payload[offset] as byte
+                         offset += 1
+                         uses = payload[offset] as short
+                         offset += 2
+                         inventory[slot] = new item(item_id, count, uses)
+                     else:
+                         inventory[slot] = None
+                        }
+                 */
+                WindowItemPayload payload;
+                writer.Write(reader.Read(out payload, Count));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(Count);
+            // going to cheat on this one
+            writer.Write(BytesRead);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleWindowitems != null)
+            {
+                return handler.HandleWindowitems(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1838,21 +3409,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out Progressbar);
-            BytesRead += reader.Read(out Value);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out Progressbar));
+                writer.Write(reader.Read(out Value));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(Progressbar);
-            writer.Write(Value);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Windowid));
+                tempWriter.Write(writer.Prepare(Progressbar));
+                tempWriter.Write(writer.Prepare(Value));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleUpdateprogressbar != null)
+            {
+                return handler.HandleUpdateprogressbar(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1867,21 +3466,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Windowid);
-            BytesRead += reader.Read(out Actionnumber);
-            BytesRead += reader.Read(out Accepted);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Windowid));
+                writer.Write(reader.Read(out Actionnumber));
+                writer.Write(reader.Read(out Accepted));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Windowid);
-            writer.Write(Actionnumber);
-            writer.Write(Accepted);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Windowid));
+                tempWriter.Write(writer.Prepare(Actionnumber));
+                tempWriter.Write(writer.Prepare(Accepted));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleTransaction != null)
+            {
+                return handler.HandleTransaction(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1897,23 +3524,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out Slot);
-            BytesRead += reader.Read(out Itemid);
-            BytesRead += reader.Read(out Quantity);
-            BytesRead += reader.Read(out Damage);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Slot));
+                writer.Write(reader.Read(out Itemid));
+                writer.Write(reader.Read(out Quantity));
+                writer.Write(reader.Read(out Damage));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Slot);
-            writer.Write(Itemid);
-            writer.Write(Quantity);
-            writer.Write(Damage);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Slot));
+                tempWriter.Write(writer.Prepare(Itemid));
+                tempWriter.Write(writer.Prepare(Quantity));
+                tempWriter.Write(writer.Prepare(Damage));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleCreativeinventoryaction != null)
+            {
+                return handler.HandleCreativeinventoryaction(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1932,29 +3587,57 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out X);
-            BytesRead += reader.Read(out Y);
-            BytesRead += reader.Read(out Z);
-            BytesRead += reader.ReadS16(out Text1);
-            BytesRead += reader.ReadS16(out Text2);
-            BytesRead += reader.ReadS16(out Text3);
-            BytesRead += reader.ReadS16(out Text4);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out X));
+                writer.Write(reader.Read(out Y));
+                writer.Write(reader.Read(out Z));
+                writer.Write(reader.Read(out Text1));
+                writer.Write(reader.Read(out Text2));
+                writer.Write(reader.Read(out Text3));
+                writer.Write(reader.Read(out Text4));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(X);
-            writer.Write(Y);
-            writer.Write(Z);
-            writer.Write(Text1);
-            writer.Write(Text2);
-            writer.Write(Text3);
-            writer.Write(Text4);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(X));
+                tempWriter.Write(writer.Prepare(Y));
+                tempWriter.Write(writer.Prepare(Z));
+                tempWriter.Write(writer.Prepare(Text1));
+                tempWriter.Write(writer.Prepare(Text2));
+                tempWriter.Write(writer.Prepare(Text3));
+                tempWriter.Write(writer.Prepare(Text4));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleUpdateSign != null)
+            {
+                return handler.HandleUpdateSign(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -1970,23 +3653,51 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out ItemType);
-            BytesRead += reader.Read(out ItemID);
-            BytesRead += reader.Read(out Textlength);
-            BytesRead += reader.Read(out Text, Textlength);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out ItemType));
+                writer.Write(reader.Read(out ItemID));
+                writer.Write(reader.Read(out Textlength));
+                writer.Write(reader.Read(out Text, Textlength));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(ItemType);
-            writer.Write(ItemID);
-            writer.Write(Textlength);
-            writer.Write(Text);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(ItemType));
+                tempWriter.Write(writer.Prepare(ItemID));
+                tempWriter.Write(writer.Prepare(Textlength));
+                tempWriter.Write(writer.Prepare(Text));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleItemData != null)
+            {
+                return handler.HandleItemData(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -2000,19 +3711,47 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.Read(out StatisticID);
-            BytesRead += reader.Read(out Amount);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out StatisticID));
+                writer.Write(reader.Read(out Amount));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(StatisticID);
-            writer.Write(Amount);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(StatisticID));
+                tempWriter.Write(writer.Prepare(Amount));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleIncrementStatistic != null)
+            {
+                return handler.HandleIncrementStatistic(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -2027,21 +3766,49 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.ReadS16(out Playername);
-            BytesRead += reader.Read(out Online);
-            BytesRead += reader.Read(out Ping);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Playername));
+                writer.Write(reader.Read(out Online));
+                writer.Write(reader.Read(out Ping));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Playername);
-            writer.Write(Online);
-            writer.Write(Ping);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Playername));
+                tempWriter.Write(writer.Prepare(Online));
+                tempWriter.Write(writer.Prepare(Ping));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandlePlayerListItem != null)
+            {
+                return handler.HandlePlayerListItem(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -2052,15 +3819,43 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleServerListPing != null)
+            {
+                return handler.HandleServerListPing(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -2072,17 +3867,45 @@ namespace uberminer
 
         public override void Read(NetworkReader reader)
         {
-            BytesRead += reader.ReadS16(out Reason);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                writer.Write((byte)Type);
+                writer.Write(reader.Read(out Reason));
+            }
+            BytesRead = ms.ToArray();
+            NumBytesRead = BytesRead.Length;
         }
 
         public override void Write(NetworkWriter writer)
         {
-            writer.Write(Reason);
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter tempWriter = new BinaryWriter(ms))
+            {
+                tempWriter.Write((byte)Type);
+
+                tempWriter.Write(writer.Prepare(Reason));
+
+            }
+
+            BytesWritten = ms.ToArray();
+            NumBytesWritten = BytesWritten.Length;
+
+            CheckPacketSanity();
+
+            writer.Write(BytesWritten);
         }
 
-        public override void Handle(PacketHandler handler)
+        public override bool Handle(PacketHandler handler)
         {
-            handler.Handle(this);
+            if (handler.HandleDisconnect_Kick != null)
+            {
+                return handler.HandleDisconnect_Kick(this);
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 
@@ -2181,6 +4004,7 @@ namespace uberminer
 
     public class Metadata
     {
+        public byte[] data;
         public Metadata()
         {
         }
@@ -2188,7 +4012,15 @@ namespace uberminer
 
     public class WindowItemPayload
     {
+        public byte[] data;
         public WindowItemPayload()
+        {
+        }
+    }
+
+    public class MapChunk
+    {
+        public MapChunk(byte[] compressedData)
         {
         }
     }

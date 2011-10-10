@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.IO;
 
 namespace uberminer
 {
@@ -16,7 +17,10 @@ namespace uberminer
 
         // a successful packet will have had one byte read to determine the packet.
         // start at 1
-        public int BytesRead = 1;
+        public int NumBytesRead = 1;
+        public int NumBytesWritten = 0;
+        public byte[] BytesRead;
+        public byte[] BytesWritten;
 
         static Packet()
         {
@@ -93,18 +97,18 @@ namespace uberminer
             packetCheck.Add(PacketType.TimeUpdate,                  true);
             packetCheck.Add(PacketType.EntityEquipment,             true);
             packetCheck.Add(PacketType.SpawnPosition,               true);
-            packetCheck.Add(PacketType.UseEntity,                   false);
+            packetCheck.Add(PacketType.UseEntity,                   true);
             packetCheck.Add(PacketType.UpdateHealth,                true);
             packetCheck.Add(PacketType.Respawn,                     false);
-            packetCheck.Add(PacketType.Player,                      false);
-            packetCheck.Add(PacketType.PlayerPosition,              false);
-            packetCheck.Add(PacketType.PlayerLook,                  false);
+            packetCheck.Add(PacketType.Player,                      true);
+            packetCheck.Add(PacketType.PlayerPosition,              true);
+            packetCheck.Add(PacketType.PlayerLook,                  true);
             packetCheck.Add(PacketType.PlayerPosition_Look,         true);
-            packetCheck.Add(PacketType.PlayerDigging,               false);
+            packetCheck.Add(PacketType.PlayerDigging,               true);
             packetCheck.Add(PacketType.PlayerBlockPlacement,        true);
             packetCheck.Add(PacketType.HoldingChange,               false);
             packetCheck.Add(PacketType.UseBed,                      false);
-            packetCheck.Add(PacketType.Animation,                   false);
+            packetCheck.Add(PacketType.Animation,                   true);
             packetCheck.Add(PacketType.EntityAction,                true);
             packetCheck.Add(PacketType.NamedEntitySpawn,            false);
             packetCheck.Add(PacketType.PickupSpawn,                 true);
@@ -112,7 +116,7 @@ namespace uberminer
             packetCheck.Add(PacketType.AddObject_Vehicle,           false);
             packetCheck.Add(PacketType.MobSpawn,                    true);
             packetCheck.Add(PacketType.EntityPainting,              false);
-            packetCheck.Add(PacketType.ExperienceOrb,               false);
+            packetCheck.Add(PacketType.ExperienceOrb,               true);
             packetCheck.Add(PacketType.Stanceupdate,                false);
             packetCheck.Add(PacketType.EntityVelocity,              true);
             packetCheck.Add(PacketType.DestroyEntity,               true);
@@ -134,21 +138,21 @@ namespace uberminer
             packetCheck.Add(PacketType.BlockAction,                 true);
             packetCheck.Add(PacketType.Explosion,                   false);
             packetCheck.Add(PacketType.Soundeffect,                 false);
-            packetCheck.Add(PacketType.New_InvalidState,            false);
+            packetCheck.Add(PacketType.New_InvalidState,            true);
             packetCheck.Add(PacketType.Thunderbolt,                 false);
-            packetCheck.Add(PacketType.Openwindow,                  false);
-            packetCheck.Add(PacketType.Closewindow,                 false);
+            packetCheck.Add(PacketType.Openwindow,                  true);
+            packetCheck.Add(PacketType.Closewindow,                 true);
             packetCheck.Add(PacketType.Windowclick,                 false);
             packetCheck.Add(PacketType.Setslot,                     true);
             packetCheck.Add(PacketType.Windowitems,                 true);
-            packetCheck.Add(PacketType.Updateprogressbar,           false);
-            packetCheck.Add(PacketType.Transaction,                 false);
+            packetCheck.Add(PacketType.Updateprogressbar,           true);
+            packetCheck.Add(PacketType.Transaction,                 true);
             packetCheck.Add(PacketType.Creativeinventoryaction,     false);
             packetCheck.Add(PacketType.UpdateSign,                  true);
             packetCheck.Add(PacketType.ItemData,                    false);
-            packetCheck.Add(PacketType.IncrementStatistic,          false);
+            packetCheck.Add(PacketType.IncrementStatistic,          true);
             packetCheck.Add(PacketType.PlayerListItem,              true);
-            packetCheck.Add(PacketType.ServerListPing,              false);
+            packetCheck.Add(PacketType.ServerListPing,              true);
             packetCheck.Add(PacketType.Disconnect_Kick,             true);
         }
 
@@ -167,48 +171,41 @@ namespace uberminer
 
         private static Dictionary<PacketType, bool> packetCheck = new Dictionary<PacketType, bool>();
 
-        public static Packet Get(PacketType id)
+        public static Packet Get(PacketType id, bool log = false)
         {
             Type type;
             if (!IdTypes.TryGetValue(id, out type))
             {
-                Program.Log("Unknown packet: 0x" + id.ToString("x"));
+                Uberminer.Log("Unknown packet: 0x" + id.ToString("x"));
                 return null;
             }
 
             var packet = Activator.CreateInstance(type) as Packet;
 
-            packetHistory.Add(packet);
+            if (log)
+            {
+                packetHistory.Add(packet);
+            }
 
             return packet;
         }
 
-        public static Packet Get(NetworkReader reader)
+        public static Packet Get(NetworkReader reader, bool log = false)
         {
-            var packetId = (PacketType)reader.ReadByte();
-            var packet = Get(packetId);
-            //try
+            PacketType packetId = reader.ReadPacketHeader();
+            var packet = Get(packetId, log);
+            if (packet == null)
+                return null;
+            packet.Read(reader);
+            if (packetCheck[packet.Type] == false)
             {
-                if (packet == null)
-                    return null;
-                //Program.Log("Reading {0}", packet.Type.ToString());
-                packet.Read(reader);
-                if (packetCheck[packet.Type] == false)
-                {
-                    Program.Log("{0} read size: {1}", packet.Type, packet.BytesRead);
-                }
-            }
-            //catch (Exception ex)
-            {
-            //    Program.Log("Packet internal error:");
-            //    Program.Log(ex.Message);
+                Uberminer.Log("{0} read size: {1}", packet.Type, packet.NumBytesRead);
             }
             return packet;
         }
 
         public static void Put(Packet packet, NetworkWriter writer)
         {
-            writer.Write((byte)packet.Id);
             packet.Write(writer);
             writer.Flush();
         }
@@ -224,8 +221,21 @@ namespace uberminer
             }
         }
 
-        public abstract void Handle(PacketHandler handler);
-        public abstract void Write(NetworkWriter writer);
+        public void CheckPacketSanity()
+        {
+            System.Diagnostics.Debug.Assert(NumBytesRead == NumBytesWritten);
+
+            //if (NumBytesRead == NumBytesWritten)
+            {
+                //for (int i = 0; i < NumBytesWritten; ++i)
+                {
+                    //System.Diagnostics.Debug.Assert(BytesWritten[i] == BytesRead[i]);
+                }
+            }
+        }
+
+        public abstract bool Handle(PacketHandler handler);
         public abstract void Read(NetworkReader reader);
+        public abstract void Write(NetworkWriter writer);
     }
 }

@@ -11,60 +11,54 @@ using System.Collections.Generic;
 
 namespace uberminer
 {
-    public static class Program
+    public class Uberminer
     {
-        static void Main(string[] args)
-        {
-            var server = new TcpClient("minecraft.omeganerd.com", 25565);
-            //var server = new TcpClient("localhost", 25566);
-            var listener = new TcpListener(IPAddress.Any, 25565);
-            listener.Start();
+        string host;
+        PacketHandler s2cHandler;
+        PacketHandler c2sHandler;
 
-            var client = listener.AcceptTcpClient();
+        public Uberminer(string ServerHost, PacketHandler ServerToClientHandler, PacketHandler ClientToServerHandler)
+        {
+            host = ServerHost;
+            s2cHandler = ServerToClientHandler;
+            c2sHandler = ClientToServerHandler;
+        }
+
+        public void Run()
+        {
+            var serverClient = new TcpClient(host, 25565);
+            var clientListener = new TcpListener(IPAddress.Any, 25565);
+
+            clientListener.Start();
+
+            var clientClient = clientListener.AcceptTcpClient();
             Log("Client connected");
 
-            var serverStream = server.GetStream();
-            var clientStream = client.GetStream();
+            var serverStream = serverClient.GetStream();
+            var clientStream = clientClient.GetStream();
 
-            var parseStream = new UberStream();
+            var serverToClientStream = new UberStream();
+            var clientToServerStream = new UberStream();
 
-            //var sk = new NamedPipeServerStream("serverpipe", PipeDirection.In);
-            //var ck = new NamedPipeServerStream("clientpipe", PipeDirection.In);
+            var s2cBi = new BidirectionalStream(
+                new NetworkReader(serverToClientStream, StreamDirection.ServerToClient),
+                new NetworkWriter(clientStream, StreamDirection.ServerToClient),
+                s2cHandler);
 
-            //var sj = new NamedPipeClientStream("localhost", "serverpipe", PipeDirection.Out);
-            //var cj = new NamedPipeClientStream("localhost", "clientpipe", PipeDirection.Out);
-
-            //sj.Connect();
-            //cj.Connect();
-
-            //try
-            //{
-            new Thread(() =>
-            {
-                NetworkReader reader = new NetworkReader(parseStream);
-                //sk.WaitForConnection();
-                while (true)
-                {
-                    Packet packet = Packet.Get(reader);
-                    if (packet != null)
-                    {
-                        //Log(packet.Type.ToString());
-                    }
-                }
-            }).Start();
-            //}
-            //catch (Exception ex)
-            //{
-            //    Log("Packet error:");
-            //    Log(ex.Message);
-            //}
+            var c2sBi = new BidirectionalStream(
+                new NetworkReader(clientToServerStream, StreamDirection.ClientToServer),
+                new NetworkWriter(serverStream, StreamDirection.ClientToServer),
+                c2sHandler);
 
             try
             {
-                new Thread(() =>
+                var s2cTS = new ThreadStart(() =>
                 {
-                    PassData(serverStream, clientStream, parseStream);
-                }).Start();
+                    PassData(serverStream, serverToClientStream);
+                });
+                var s2cThread = new Thread(s2cTS);
+                s2cThread.Name = "RootS2C";
+                s2cThread.Start();
             }
             catch (Exception ex)
             {
@@ -74,10 +68,13 @@ namespace uberminer
 
             try
             {
-                new Thread(() =>
+                var c2sTS = new ThreadStart(() =>
                 {
-                    PassData(clientStream, serverStream);
-                }).Start();
+                    PassData(clientStream, clientToServerStream);
+                });
+                var c2sThread = new Thread(c2sTS);
+                c2sThread.Name = "RootC2S";
+                c2sThread.Start();
             }
             catch (Exception ex)
             {
@@ -91,23 +88,30 @@ namespace uberminer
                 Thread.Sleep(1000);
             }
         }
-
-        static void PassData(Stream from, params Stream[] to)
+        
+        private void PassData(NetworkReader from, NetworkWriter to)
         {
-            byte b;
+            Packet packet;
             {
-                try
+                for (; ; )
                 {
-                    for (; ; )
-                    {
-                        b = (byte)from.ReadByte();
-                        foreach (var s in to)
-                            s.WriteByte(b);
-                    }
+                    packet = Packet.Get(from);
+                    packet.Write(to);
                 }
-                catch (System.Exception ex)
-                {
+            }
+        }
 
+        private void PassData(Stream from, Stream to)
+        {
+            byte[] b = new byte[512];
+            {
+                for (; ; )
+                {
+                    var read = from.Read(b, 0, 512);
+                    if (read > 0)
+                    {
+                        to.Write(b, 0, read);
+                    }
                 }
             }
         }

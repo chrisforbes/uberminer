@@ -9,55 +9,77 @@ namespace uberminer
 {
     public class NetworkReader : BinaryReader
     {
-        public NetworkReader(Stream stream) : base(stream) { }
+        public StreamDirection direction;
 
-        public int Read(out byte b)
+        public NetworkReader(Stream stream, StreamDirection dir)
+            : base(stream)
         {
-            b = ReadByte();
-            return 1;
+            direction = dir;
         }
 
-        public int Read(out short s)
+        public byte[] Read(out byte b)
         {
-            s = IPAddress.NetworkToHostOrder(ReadInt16());
-            return 2;
+            var bytes = ReadBytes(1);
+            b = bytes[0];
+            return bytes;
         }
 
-        public int Read(out int i)
+        public byte[] Read(out short s)
         {
-            i = IPAddress.NetworkToHostOrder(ReadInt32());
-            return 4;
+            var bytes = ReadBytes(2);
+            byte[] b = new byte[2];
+            bytes.CopyTo(b, 0);
+            Array.Reverse(b);
+            s = BitConverter.ToInt16(b, 0);
+            return bytes;
         }
 
-        public int Read(out long l)
+        public byte[] Read(out int i)
         {
-            l = IPAddress.NetworkToHostOrder(ReadInt64());
-            return 8;
+            var bytes = ReadBytes(4);
+            byte[] b = new byte[4];
+            bytes.CopyTo(b, 0);
+            Array.Reverse(b);
+            i = BitConverter.ToInt32(b, 0);
+            return bytes;
         }
 
-        public int Read(out double d)
+        public byte[] Read(out long l)
         {
-            var a = ReadBytes(8);
-            Array.Reverse(a);
-            d = BitConverter.ToDouble(a, 0);
-            return 8;
+            var bytes = ReadBytes(8);
+            byte[] b = new byte[8];
+            bytes.CopyTo(b, 0);
+            Array.Reverse(b);
+            l = BitConverter.ToInt64(b, 0);
+            return bytes;
         }
 
-        public int Read(out float f)
+        public byte[] Read(out double d)
         {
-            var a = ReadBytes(4);
-            Array.Reverse(a);
-            f = BitConverter.ToSingle(a, 0);
-            return 4;
+            var bytes = ReadBytes(8);
+            byte[] b = new byte[8];
+            bytes.CopyTo(b, 0);
+            Array.Reverse(b);
+            d = BitConverter.ToDouble(b, 0);
+            return bytes;
         }
 
-        public int Read(out bool b)
+        public byte[] Read(out float f)
         {
-            b = ReadBoolean();
-            return 1;
+            var bytes = ReadBytes(4);
+            Array.Reverse(bytes);
+            f = BitConverter.ToSingle(bytes, 0);
+            return bytes;
         }
 
-        public int Read(out Metadata m)
+        public byte[] Read(out bool b)
+        {
+            var bytes = ReadBytes(1);
+            b = BitConverter.ToBoolean(bytes, 0);
+            return bytes;
+        }
+
+        public byte[] Read(out Metadata m)
         {
             /*
             let x = 0 of type UNSIGNED byte
@@ -74,76 +96,75 @@ namespace uberminer
             end while
              */
 
-            int read = 0;
-
-            var x = (byte)0x0;
-            while (true)
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                Read(out x);
-
-                ++read;
-
-                if (x == 127)
+                while (true)
                 {
-                    break;
-                }
-                switch (x >> 5)
-                {
-                    case 0x0:
-                        {
-                            byte b;
-                            read += Read(out b);
-                            break;
-                        }
-                    case 0x1:
-                        {
-                            short s;
-                            read += Read(out s);
-                            break;
-                        }
-                    case 0x2:
-                        {
-                            int i;
-                            read += Read(out i);
-                            break;
-                        }
-                    case 0x3:
-                        {
-                            float f;
-                            read += Read(out f);
-                            break;
-                        }
-                    case 0x4:
-                        {
-                            string s;
-                            read += ReadS16(out s);
-                            break;
-                        }
-                    case 0x5:
-                        {
-                            short s;
-                            byte b;
-                            read += Read(out s);
-                            read += Read(out b);
-                            read += Read(out s);
-                            break;
-                        }
-                    case 0x6:
-                        {
-                            int i;
-                            read += Read(out i);
-                            read += Read(out i);
-                            read += Read(out i);
-                            break;
-                        }
+                    var n = ReadBytes(1);
+                    writer.Write(n);
+                    var x = n[0];
+
+                    if (x == 127)
+                    {
+                        break;
+                    }
+                    switch (x >> 5)
+                    {
+                        case 0x0:
+                            {
+                                // byte
+                                writer.Write(ReadBytes(1));
+                                break;
+                            }
+                        case 0x1:
+                            {
+                                // short
+                                writer.Write(ReadBytes(2));
+                                break;
+                            }
+                        case 0x2:
+                            {
+                                // int
+                                writer.Write(ReadBytes(4));
+                                break;
+                            }
+                        case 0x3:
+                            {
+                                // float
+                                writer.Write(ReadBytes(2));
+                                break;
+                            }
+                        case 0x4:
+                            {
+                                short s;
+
+                                writer.Write(Read(out s));
+                                writer.Write(ReadBytes(s * 2));
+                                break;
+                            }
+                        case 0x5:
+                            {
+                                // short, byte, short
+                                writer.Write(ReadBytes(5));
+                                break;
+                            }
+                        case 0x6:
+                            {
+                                // int, int, int
+                                writer.Write(ReadBytes(12));
+                                break;
+                            }
+                    }
                 }
             }
 
             m = new Metadata();
-            return read;
+            m.data = ms.ToArray();
+            return m.data;
         }
 
-        public int Read(out WindowItemPayload p, int count)
+        public byte[] Read(out WindowItemPayload p, int count)
         {
             /*
              offset = 0
@@ -161,98 +182,116 @@ namespace uberminer
                      inventory[slot] = None
                     }
              */
-            var read = 0;
 
-            for (int slot = 0; slot < count; ++slot)
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                short id;
-                read += Read(out id);
-                if (id != -1)
+                for (int slot = 0; slot < count; ++slot)
                 {
-                    byte quantity;
-                    read += Read(out quantity);
-                    short uses;
-                    read += Read(out uses);
+                    short id;
+
+                    writer.Write(Read(out id));
+
+                    if (id != -1)
+                    {
+                        writer.Write(ReadBytes(3));
+                    }
                 }
             }
 
             p = new WindowItemPayload();
-            return read;
+            p.data = ms.ToArray();
+            return p.data;
         }
 
-        public int Read(out byte[] b, int size)
+        public byte[] Read(out byte[] b, int size)
         {
-            int read = size;
             b = ReadBytes(size);
-            return read;
+            return b;
         }
 
-        public int Read(out short[] b, int size)
+        public byte[] Read(out short[] b, int size)
         {
-            int read = size;
             var shorts = new short[size];
-            for (var i = 0; i < size; ++i)
+
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                read += Read(out shorts[i]);
+                for (var i = 0; i < size; ++i)
+                {
+                    writer.Write(Read(out shorts[i]));
+                }
             }
+
             b = shorts;
-            return read;
+            return ms.ToArray();
         }
 
-        public int ReadAngle(out double angle)
+        public byte[] ReadAngle(out double angle)
         {
-            var val = ReadByte();
-            angle = val / 256.0 * 360.0;
-            return 1;
+            var b = ReadBytes(1);
+            angle = b[0] / 256.0 * 360.0;
+            return b;
         }
 
-        public int ReadS16(out string s)
+        public byte[] Read(out string s)
         {
             int read = 0;
             short length;
-            read += Read(out length);
 
-            string t = "";
-
-            System.Diagnostics.Debug.Assert(length < 1000);
-
-            if (length >= 0)
+            MemoryStream ms = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(ms))
             {
-                var enc = new UTF8Encoding();
-                var b = ReadBytes(length * 2);
+                writer.Write(Read(out length));
 
-                for (var i = 0; i < length * 2; i += 2)
+                string t = "";
+
+                System.Diagnostics.Debug.Assert(length < 1000);
+
+                if (length >= 0)
                 {
-                    t += (char)(b[i + 0] << 8 | b[i + 1]);
+                    var enc = new ASCIIEncoding();
+                    var b = ReadBytes(length * 2);
+                    writer.Write(b);
+
+                    for (var i = 0; i < length * 2; i += 2)
+                    {
+                        t += (char)(b[i + 0] << 8 | b[i + 1]);
+                    }
+                    s = t;
+                    read += length * 2;
                 }
-                s = t;
-                read += length * 2;
-            }
-            else
-            {
-                s = "";
+                else
+                {
+                    s = "";
+                }
             }
 
-            return read;
+            return  ms.ToArray();
+        }
+
+        public PacketType ReadPacketHeader()
+        {
+            return (PacketType)ReadByte();
         }
 
         // I don't think this type is ever used
-        public int ReadS8(out string s)
-        {
-            int read = 0;
-            short length;
-            read += Read(out length);
+        //public int ReadS8(out string s)
+        //{
+        //    int read = 0;
+        //    short length;
+        //    read += Read(out length);
 
-            if (length >= 0)
-            {
-                s = Encoding.UTF8.GetString(ReadBytes(length));
-                read += length;
-            }
-            else
-            {
-                s = "";
-            }
-            return read;
-        }
+        //    if (length >= 0)
+        //    {
+        //        s = Encoding.UTF8.GetString(ReadBytes(length));
+        //        read += length;
+        //    }
+        //    else
+        //    {
+        //        s = "";
+        //    }
+        //    return read;
+        //}
     }
 }
