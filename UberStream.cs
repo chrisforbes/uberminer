@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-namespace uberminer
+namespace Uberminer
 {
     public class UberStream : Stream
     {

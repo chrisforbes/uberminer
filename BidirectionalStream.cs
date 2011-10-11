@@ -5,7 +5,7 @@ using System.Text;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace uberminer
+namespace Uberminer
 {
     public enum StreamDirection
     {

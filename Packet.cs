@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.IO;
 
-namespace uberminer
+namespace Uberminer
 {
     public abstract class Packet
     {

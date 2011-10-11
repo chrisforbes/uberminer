@@ -47,9 +47,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\uberminer.csproj">
+    <ProjectReference Include="..\Uberminer.csproj">
       <Project>{A2BFC0EF-A62C-4582-A213-AFEDAB1F3931}</Project>
-      <Name>uberminer</Name>
+      <Name>Uberminer</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

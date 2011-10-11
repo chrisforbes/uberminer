@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace uberminer
+namespace Uberminer
 {
     // quick hack
     public class Vector3

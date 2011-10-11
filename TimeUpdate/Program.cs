@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using uberminer;
+using Uberminer;
 using System.Threading;
 
 namespace TimeUpdate

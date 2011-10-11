@@ -5,7 +5,7 @@ using System.Text;
 using System.IO;
 using System.Net;
 
-namespace uberminer
+namespace Uberminer
 {
     public class NetworkReader : BinaryReader
     {
