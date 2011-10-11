@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-namespace Uberminer
+namespace uberminer
 {
     public class Uberminer
     {

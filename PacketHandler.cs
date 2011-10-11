@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Drawing;
 
-namespace Uberminer
+namespace uberminer
 {
     public sealed class PacketHandler
     {
